@@ -1,12 +1,12 @@
-import aiofiles
 from contextlib import asynccontextmanager, suppress
+
+import aiofiles
 from environs import Env
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
-
-from starlette.websockets import WebSocketDisconnect
 from gigachat import GigaChat
 from gigachat.models import Chat, Messages, MessagesRole
+from starlette.websockets import WebSocketDisconnect
 
 env = Env()
 env.read_env()
