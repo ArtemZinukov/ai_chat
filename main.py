@@ -28,13 +28,16 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-async def ask_giga(client: GigaChat, prompt: str) -> str:
+async def ask_giga_stream(client: GigaChat, prompt: str):
     payload = Chat(
         messages=[Messages(role=MessagesRole.USER, content=prompt)],
         model=GIGA_MODEL
     )
-    response = await client.achat(payload)
-    return response.choices[0].message.content
+
+    async for chunk in client.astream(payload):
+        content = chunk.choices[0].delta.content
+        if content:
+            yield content
 
 async def read_file(file):
     async with aiofiles.open(file, mode="r", encoding="utf-8") as f:
@@ -60,12 +63,12 @@ async def websocket_endpoint(websocket: WebSocket):
                 user_prompt = data.get("content")
 
                 if user_prompt:
-                    answer = await ask_giga(giga, user_prompt)
+                    async for partial_text in ask_giga_stream(giga, user_prompt):
+                        await websocket.send_json({
+                            "type": "ai_response_chunk",
+                            "content": partial_text
+                        })
 
-                    await websocket.send_json({
-                        "type": "ai_response_chunk",
-                        "content": answer
-                    })
         finally:
             with suppress(RuntimeError):
                 await websocket.close()
