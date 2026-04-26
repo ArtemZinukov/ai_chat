@@ -26,10 +26,15 @@ pip install -r requirements.txt
 Запустите сервер разработки с помощью uvicorn:
 
 
-```uvicorn main:app --reload```, 
+```
+uvicorn main:app --reload
+```
+ 
 
-либо:
+Либо с помощью FastAPI CLI:
 
-```fastapi dev main.py```
+```
+fastapi dev main.py
+```
 
 После запуска проект будет доступен по адресу: [localhost](http://127.0.0.1:8000)
