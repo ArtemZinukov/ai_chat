@@ -14,6 +14,7 @@ env.read_env()
 GIGA_CREDS = env.str("GIGACHAT_CREDENTIALS")
 GIGA_SCOPE = env.str("GIGACHAT_SCOPE", "GIGACHAT_API_PERS")
 GIGA_MODEL = env.str("GIGACHAT_MODEL", "GigaChat")
+MAX_HISTORY_SIZE = 10
 
 
 @asynccontextmanager
@@ -29,16 +30,24 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-async def ask_giga_stream(client: GigaChat, prompt: str):
+async def ask_giga_stream(client: GigaChat, prompt: str, history: list[Messages]):
+    history.append(Messages(role=MessagesRole.USER, content=prompt))
+
     payload = Chat(
-        messages=[Messages(role=MessagesRole.USER, content=prompt)],
+        messages=history,
         model=GIGA_MODEL
     )
+
+    full_answer_chunks = []
 
     async for chunk in client.astream(payload):
         content = chunk.choices[0].delta.content
         if content:
+            full_answer_chunks.append(content)
             yield content
+
+    full_answer = "".join(full_answer_chunks)
+    history.append(Messages(role=MessagesRole.ASSISTANT, content=full_answer))
 
 
 async def read_file(file):
@@ -61,6 +70,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
     giga: GigaChat = get_giga_client()
 
+    chat_history: list[Messages] = []
+
     with suppress(WebSocketDisconnect):
         try:
             while True:
@@ -68,8 +79,17 @@ async def websocket_endpoint(websocket: WebSocket):
                 user_prompt = data.get("content")
 
                 if user_prompt:
+                    if len(chat_history) >= MAX_HISTORY_SIZE:
+                        await websocket.send_json({
+                            "type": "info",
+                            "content": "⚠️ Лимит истории исчерпан."
+                                       " Следующие ответы могут не учитывать контекст начала беседы."
+                        })
+
+                        chat_history = chat_history[2:]
+
                     async for partial_text in ask_giga_stream(
-                            giga, user_prompt
+                            giga, user_prompt, chat_history
                     ):
                         await websocket.send_json({
                             "type": "ai_response_chunk",
