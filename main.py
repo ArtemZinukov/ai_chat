@@ -15,6 +15,7 @@ GIGA_CREDS = env.str("GIGACHAT_CREDENTIALS")
 GIGA_SCOPE = env.str("GIGACHAT_SCOPE", "GIGACHAT_API_PERS")
 GIGA_MODEL = env.str("GIGACHAT_MODEL", "GigaChat")
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with GigaChat(
@@ -39,16 +40,20 @@ async def ask_giga_stream(client: GigaChat, prompt: str):
         if content:
             yield content
 
+
 async def read_file(file):
     async with aiofiles.open(file, mode="r", encoding="utf-8") as f:
         return await f.read()
+
 
 @app.get("/", response_class=HTMLResponse)
 async def read_index():
     return await read_file("index.html")
 
+
 def get_giga_client():
     return app.state.giga_client
+
 
 @app.websocket("/ws/chat")
 async def websocket_endpoint(websocket: WebSocket):
@@ -63,7 +68,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 user_prompt = data.get("content")
 
                 if user_prompt:
-                    async for partial_text in ask_giga_stream(giga, user_prompt):
+                    async for partial_text in ask_giga_stream(
+                            giga, user_prompt
+                    ):
                         await websocket.send_json({
                             "type": "ai_response_chunk",
                             "content": partial_text
